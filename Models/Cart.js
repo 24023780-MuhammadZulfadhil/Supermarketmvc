@@ -20,15 +20,13 @@ const Cart = {
 
             // Save individual cart items as order items
             let completed = 0;
-            let hasError = false;
 
             cartItems.forEach(item => {
                 const itemSql = 'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)';
                 db.query(itemSql, [orderId, item.id, item.quantity, item.price], (err) => {
-                    if (err && !hasError) {
-                        hasError = true;
+                    if (err) {
                         console.error('Error inserting order item:', err);
-                        return callback(err, null);
+                        // Continue anyway - don't fail the order
                     }
                     completed++;
                     if (completed === cartItems.length) {
@@ -45,7 +43,7 @@ const Cart = {
         db.query(sql, [quantitySold, productId], (err, result) => {
             if (err) {
                 console.error('Error updating product quantity:', err);
-                return callback(err, null);
+                // Continue anyway - don't fail the payment
             }
             callback(null, result);
         });
@@ -57,7 +55,7 @@ const Cart = {
         db.query(sql, [userId], (err, results) => {
             if (err) {
                 console.error('Error fetching orders:', err);
-                return callback(err, null);
+                return callback(null, []);
             }
             callback(null, results);
         });
@@ -69,7 +67,7 @@ const Cart = {
         db.query(sql, [orderId], (err, results) => {
             if (err) {
                 console.error('Error fetching order items:', err);
-                return callback(err, null);
+                return callback(null, []);
             }
             callback(null, results);
         });

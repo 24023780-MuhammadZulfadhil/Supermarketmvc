@@ -301,17 +301,35 @@ app.post('/process-payment', checkAuthenticated, (req, res) => {
     const cart = req.session.cart || [];
     const userId = req.session.user.id;
 
+    if (!cart || cart.length === 0) {
+        req.flash('error', 'Your cart is empty');
+        return res.redirect('/cart');
+    }
+
+    // Process payment and update inventory
     cartController.processPayment(cart, userId, (err, result) => {
         if (err) {
             console.error('Payment error:', err.message);
             req.flash('error', 'Payment failed: ' + err.message);
-            return res.redirect('/cart');
+            return res.redirect('/checkout');
         }
 
+        console.log('✅ Payment processed successfully');
+        console.log('Order ID:', result.orderId);
+        console.log('Total Amount:', result.totalAmount);
+        
         // Clear cart after successful payment
         req.session.cart = [];
-        req.flash('success', `Payment successful! Order #${result.orderId} placed. Thank you!`);
-        res.redirect('/payment-success');
+        
+        // Render invoice/payment success page with order details
+        res.render('paymentSuccess', {
+            orderId: result.orderId,
+            totalAmount: result.totalAmount,
+            itemsCount: result.itemsCount,
+            cartItems: cart,
+            user: req.session.user,
+            orderDate: new Date().toLocaleString()
+        });
     });
 });
 
