@@ -1,4 +1,4 @@
-
+const db = require('./db');
 
 // Cart model - handles ONLY database operations for cart history/orders
 const Cart = {
