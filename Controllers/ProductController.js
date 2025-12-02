@@ -124,6 +124,25 @@ const productController = {
         return cart.reduce((total, item) => {
             return total + (item.price * item.quantity);
         }, 0);
+    },
+
+    // Search products by name
+    searchProducts: function(query, callback) {
+        this.getAllProducts((err, products) => {
+            if (err) {
+                return callback(err, null);
+            }
+
+            const searchResults = products.filter(product =>
+                product.productName.toLowerCase().includes(query.toLowerCase())
+            );
+
+            if (searchResults.length === 0) {
+                return callback(null, []);
+            }
+
+            callback(null, searchResults);
+        });
     }
 };
 

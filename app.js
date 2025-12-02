@@ -5,22 +5,30 @@ const multer = require('multer');
 
 // Check if controllers exist before requiring
 console.log('Loading controllers...');
-let productController, userController;
+let productController, userController, cartController;
 
 try {
     productController = require('./Controllers/ProductController');
-    console.log('✅ SupermarketController loaded');
+    console.log(' ProductController loaded');
 } catch (err) {
-    console.error('❌ Error loading ProductController:', err.message);
+    console.error(' Error loading ProductController:', err.message);
     process.exit(1);
 }
 
 try {
     userController = require('./Controllers/UserController');
-    console.log('✅ UserController loaded');
+    console.log(' UserController loaded');
 } catch (err) {
-    console.error('❌ Error loading UserController:', err.message);
+    console.error(' Error loading UserController:', err.message);
     console.error('Make sure Controllers/UserController.js exists!');
+    process.exit(1);
+}
+
+try {
+    cartController = require('./Controllers/CartController');
+    console.log(' CartController loaded');
+} catch (err) {
+    console.error(' Error loading CartController:', err.message);
     process.exit(1);
 }
 
@@ -145,7 +153,7 @@ app.post('/login', (req, res, next) => {
 
     // Check if userController exists
     if (!userController || !userController.login) {
-        console.error('❌ UserController or login function not found!');
+        console.error(' UserController or login function not found!');
         return res.status(500).send('UserController not properly configured');
     }
 
@@ -156,7 +164,7 @@ app.post('/login', (req, res, next) => {
             return res.redirect('/login');
         }
 
-        console.log('✅ Login successful for:', email);
+        console.log('✅Login successful for:', email);
         req.session.user = user;
         req.flash('success', 'Login successful!');
         
@@ -188,6 +196,24 @@ app.get('/shopping', checkAuthenticated, (req, res) => {
     });
 });
 
+// Search products
+app.get('/search', checkAuthenticated, (req, res) => {
+    const query = req.query.q || '';
+    
+    if (!query.trim()) {
+        req.flash('error', 'Please enter a search term');
+        return res.redirect('/shopping');
+    }
+
+    productController.searchProducts(query, (err, products) => {
+        if (err) {
+            req.flash('error', 'Error searching products');
+            return res.redirect('/shopping');
+        }
+        res.render('shopping', { products, searchQuery: query });
+    });
+});
+
 // View single product
 app.get('/product/:id', checkAuthenticated, (req, res) => {
     productController.getProductById(req.params.id, (err, product) => {
@@ -204,7 +230,7 @@ app.get('/product/:id', checkAuthenticated, (req, res) => {
 // View cart
 app.get('/cart', checkAuthenticated, (req, res) => {
     const cart = req.session.cart || [];
-    const total = productController.calculateCartTotal(cart);
+    const total = cartController.calculateCartTotal(cart);
     res.render('cart', { cart, total });
 });
 
@@ -213,7 +239,7 @@ app.post('/add-to-cart/:id', checkAuthenticated, (req, res) => {
     const productId = parseInt(req.params.id);
     const quantity = parseInt(req.body.quantity) || 1;
 
-    productController.addToCart(req.session.cart, productId, quantity, (err, updatedCart) => {
+    cartController.addToCart(req.session.cart, productId, quantity, (err, updatedCart) => {
         if (err) {
             req.flash('error', err.message);
             return res.redirect('/shopping');
@@ -228,11 +254,70 @@ app.post('/add-to-cart/:id', checkAuthenticated, (req, res) => {
 // Remove from cart
 app.post('/remove-from-cart/:id', checkAuthenticated, (req, res) => {
     const productId = parseInt(req.params.id);
-    if (req.session.cart) {
-        req.session.cart = req.session.cart.filter(item => item.id !== productId);
+    cartController.removeFromCart(req.session.cart, productId, (err, updatedCart) => {
+        if (err) {
+            req.flash('error', err.message);
+            return res.redirect('/cart');
+        }
+        req.session.cart = updatedCart;
+        req.flash('success', 'Item removed from cart');
+        res.redirect('/cart');
+    });
+});
+
+// Payment confirmation page
+app.get('/checkout', checkAuthenticated, (req, res) => {
+    const cart = req.session.cart || [];
+    if (cart.length === 0) {
+        req.flash('error', 'Your cart is empty');
+        return res.redirect('/cart');
     }
-    req.flash('success', 'Item removed from cart');
-    res.redirect('/cart');
+
+    // Fetch full product details for each cart item
+    productController.getAllProducts((err, products) => {
+        if (err) {
+            req.flash('error', 'Error loading checkout');
+            return res.redirect('/cart');
+        }
+
+        // Enrich cart with product details
+        const cartWithDetails = cart.map(cartItem => {
+            const product = products.find(p => p.id === cartItem.id);
+            return {
+                ...cartItem,
+                name: product ? product.name : 'Unknown Product',
+                image: product ? product.image : 'default.jpg',
+                price: product ? product.price : 0
+            };
+        });
+
+        const total = cartController.calculateCartTotal(cart);
+        res.render('checkout', { cart: cartWithDetails, total });
+    });
+});
+
+// Process payment
+app.post('/process-payment', checkAuthenticated, (req, res) => {
+    const cart = req.session.cart || [];
+    const userId = req.session.user.id;
+
+    cartController.processPayment(cart, userId, (err, result) => {
+        if (err) {
+            console.error('Payment error:', err.message);
+            req.flash('error', 'Payment failed: ' + err.message);
+            return res.redirect('/cart');
+        }
+
+        // Clear cart after successful payment
+        req.session.cart = [];
+        req.flash('success', `Payment successful! Order #${result.orderId} placed. Thank you!`);
+        res.redirect('/payment-success');
+    });
+});
+
+// Payment success page
+app.get('/payment-success', checkAuthenticated, (req, res) => {
+    res.render('paymentSuccess');
 });
 
 // ============== INVENTORY ROUTES (ADMIN) ==============
