@@ -76,6 +76,36 @@ const userController = {
             delete user.password;
             callback(null, user);
         });
+    },
+
+    // Get all users
+    getAllUsers: function(callback) {
+        User.getAll((err, results) => {
+            if (err) {
+                console.error('Error fetching users:', err);
+                return callback(err, null);
+            }
+            callback(null, results);
+        });
+    },
+
+    // Delete user
+    deleteUser: function(userId, callback) {
+        // Prevent deleting the current admin or last admin
+        if (userId === 1) {
+            return callback(new Error('Cannot delete this user'), null);
+        }
+
+        User.delete(userId, (err, result) => {
+            if (err) {
+                console.error('Error deleting user:', err);
+                return callback(err, null);
+            }
+            if (result.affectedRows === 0) {
+                return callback(new Error('User not found'), null);
+            }
+            callback(null, result);
+        });
     }
 };
 

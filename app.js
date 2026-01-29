@@ -417,6 +417,31 @@ app.get('/deleteProduct/:id', checkAuthenticated, checkAdmin, (req, res) => {
     });
 });
 
+// ============== USER MANAGEMENT ROUTES (ADMIN) ==============
+
+// View all users
+app.get('/manage-users', checkAuthenticated, checkAdmin, (req, res) => {
+    userController.getAllUsers((err, users) => {
+        if (err) {
+            req.flash('error', 'Error loading users');
+            return res.redirect('/inventory');
+        }
+        res.render('manageUsers', { users });
+    });
+});
+
+// Delete user
+app.get('/deleteUser/:id', checkAuthenticated, checkAdmin, (req, res) => {
+    userController.deleteUser(req.params.id, (err, result) => {
+        if (err) {
+            req.flash('error', err.message);
+        } else {
+            req.flash('success', 'User deleted successfully');
+        }
+        res.redirect('/manage-users');
+    });
+});
+
 // 404 handler
 app.use((req, res) => {
     res.status(404).render('404', { url: req.url });

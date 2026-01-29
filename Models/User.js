@@ -43,6 +43,22 @@ const User = {
             userData.contact,
             id
         ], callback);
+    },
+
+    // Get all users
+    getAll: function(callback) {
+        const sql = 'SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC';
+        db.query(sql, (err, results) => {
+            callback(err, results);
+        });
+    },
+
+    // Delete user by ID
+    delete: function(id, callback) {
+        const sql = 'DELETE FROM users WHERE id = ?';
+        db.query(sql, [id], (err, result) => {
+            callback(err, result);
+        });
     }
 };
 
